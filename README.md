@@ -1,24 +1,89 @@
+# UsageLedger
 
-### **UsageLedger**
+UsageLedger is a usage-based billing and reconciliation platform for SaaS products.
 
-A usage-based billing and reconciliation platform for SaaS products. It ingests raw product-usage events, validates them, prevents duplicate billing, aggregates usage into meters, calculates charges, and reconciles the results.
+It is built to help teams that bill on consumption rather than fixed seats. The platform ingests raw usage events, validates them, deduplicates retries, stores an immutable ledger, aggregates usage into meters, applies pricing, and runs reconciliation so billing data can be reviewed with confidence.
+
+## What it does
+
+UsageLedger is designed around a few core jobs:
+
+- accept usage events from SDKs, HTTP clients, or CSV backfills
+- validate event structure and values
+- prevent duplicate billing from retries
+- keep an append-only event ledger
+- aggregate events into billable meters
+- apply flat, tiered, volume, allowance, and credit pricing models
+- reconcile raw usage against metered usage and calculated charges
+- expose the results through a dashboard and API
+
+This makes it useful for:
+
+- AI products billing on tokens, requests, or images
+- API platforms billing on request volume
+- SaaS apps that need usage reporting and billing transparency
+
+## Architecture
+
+```text
+SDK / REST API / CSV
+        ↓
+Usage event ingestion
+        ↓
+Validation and idempotency
+        ↓
+Immutable usage ledger
+        ↓
+Meter aggregation
+        ↓
+Pricing calculation
+        ↓
+Reconciliation
+        ↓
+Usage and billing reporting
+```
+
+## Product model
+
+The system is organized by workspace.
+
+Each workspace contains:
+
+- API keys
+- customers
+- meter definitions
+- pricing plans
+- usage events
+- dead-letter events
+- reconciliation runs
+
+### Core entities
+
+- **Usage event**: the raw billable action emitted by your product
+- **Meter**: a rule that turns events into usage totals
+- **Pricing plan**: a rule that turns usage totals into currency
+- **Reconciliation run**: a comparison between raw usage, metered usage, and charges
 
 ## Quickstart
 
-Run the backend and frontend locally:
+### Run locally
+
+Backend:
 
 ```bash
-# Terminal 1
 cd app/backend
 python -m uvicorn server:app --host 0.0.0.0 --port 8000
+```
 
-# Terminal 2
+Frontend:
+
+```bash
 cd app/frontend
 yarn install
 yarn start
 ```
 
-Local defaults:
+### Local defaults
 
 ```text
 Backend: http://localhost:8000
@@ -26,7 +91,7 @@ Frontend: http://localhost:3000
 Demo API key: ulk_demo_secret_key_xyz
 ```
 
-Smoke-test the API:
+### Smoke test the backend
 
 ```bash
 curl http://localhost:8000/api/
@@ -50,7 +115,7 @@ curl -X POST http://localhost:8000/api/v1/events \
   }'
 ```
 
-Useful follow-up checks:
+Useful follow-ups:
 
 ```bash
 curl -H "X-API-Key: ulk_demo_secret_key_xyz" \
@@ -62,7 +127,123 @@ curl -X POST http://localhost:8000/api/v1/reconciliation/run \
   -d '{"period":"2026-06"}'
 ```
 
-Example incoming events:
+## API overview
+
+All API routes are mounted under `/api`.
+
+### Health
+
+`GET /api/`
+
+Returns service status.
+
+### Events
+
+`POST /api/v1/events`
+
+Ingest one usage event.
+
+`POST /api/v1/events/batch`
+
+Ingest an array of usage events.
+
+`POST /api/v1/events/csv`
+
+Upload a CSV file with usage events.
+
+`GET /api/v1/events`
+
+List stored usage events.
+
+### Customers
+
+`POST /api/v1/customers`
+
+Create a customer record.
+
+`GET /api/v1/customers`
+
+List customers in the workspace.
+
+### Meters
+
+`POST /api/v1/meters`
+
+Create a meter definition.
+
+`GET /api/v1/meters`
+
+List meter definitions.
+
+`DELETE /api/v1/meters/{meter_id}`
+
+Delete a meter.
+
+### Pricing plans
+
+`POST /api/v1/pricing-plans`
+
+Create a pricing plan for a meter.
+
+`GET /api/v1/pricing-plans`
+
+List pricing plans.
+
+`DELETE /api/v1/pricing-plans/{plan_id}`
+
+Delete a pricing plan.
+
+### Usage and overview
+
+`GET /api/v1/usage/{customer_id}`
+
+Return usage totals and estimated charge for a customer.
+
+`GET /api/v1/overview`
+
+Return workspace summary metrics for the current period.
+
+### Reconciliation
+
+`POST /api/v1/reconciliation/run`
+
+Run reconciliation for a billing period.
+
+`GET /api/v1/reconciliation`
+
+List reconciliation runs.
+
+`GET /api/v1/reconciliation/{run_id}`
+
+Fetch a reconciliation run.
+
+### Dead-letter queue
+
+`GET /api/v1/dead-letter-events`
+
+List dead-letter events.
+
+`POST /api/v1/dead-letter-events/{dlq_id}/retry`
+
+Retry one dead-letter event.
+
+`POST /api/v1/dead-letter-events/bulk-retry`
+
+Retry all pending dead-letter events.
+
+### Workspace and keys
+
+`GET /api/v1/workspace`
+
+Return the active workspace and API keys.
+
+`POST /api/v1/workspace/keys`
+
+Create a new API key.
+
+## Event format
+
+UsageLedger expects this base event envelope:
 
 ```json
 {
@@ -70,560 +251,139 @@ Example incoming events:
   "customer_id": "cust_123",
   "event_type": "llm_tokens",
   "timestamp": "2026-06-15T10:30:00Z",
-  "properties": {
-    "model": "gpt-5",
-    "input_tokens": 1200,
-    "output_tokens": 450
-  }
+  "properties": {}
 }
 ```
 
-Another customer might send:
+Rules:
 
-```json
-{
-  "event_id": "evt_002",
-  "customer_id": "cust_456",
-  "event_type": "api_request",
-  "timestamp": "2026-06-15T10:31:00Z",
-  "properties": {
-    "endpoint": "/generate",
-    "region": "ap-south-1"
-  }
-}
-```
+- `event_id` is required
+- `customer_id` is required
+- `event_type` is required
+- `timestamp` is required and must be valid
+- numeric values in `properties` must not be negative
+- very old or far-future timestamps are rejected
 
-The platform converts those raw events into billable usage.
+## Deduplication and idempotency
 
-```text
-Customer cust_123
-Input tokens:   82,000
-Output tokens:  31,000
-Calculated charge: ₹1,426
-```
-
-OpenMeter and Lago use a similar high-level model: ingest granular events, aggregate them into meters or billable metrics, and use the results for billing or usage limits. ([OpenMeter][2])
-
----
-
-# Core workflow
-
-```text
-SDK / REST API / CSV
-        ↓
-Usage-event ingestion
-        ↓
-Schema validation
-        ↓
-Idempotency and deduplication
-        ↓
-Raw immutable event ledger
-        ↓
-Meter aggregation
-        ↓
-Pricing calculation
-        ↓
-Reconciliation
-        ↓
-Usage and billing report
-```
-
----
-
-# Features to implement
-
-## 1. Usage ingestion API
-
-```http
-POST /v1/events
-POST /v1/events/batch
-```
-
-Support:
-
-* Individual events
-* Batch ingestion
-* JSON
-* CSV backfills
-* API-key authentication
-* Idempotency keys
-
-Example response:
-
-```json
-{
-  "accepted": 98,
-  "duplicates": 1,
-  "rejected": 1
-}
-```
-
-Using a common event envelope such as CloudEvents would be a reasonable design choice because CloudEvents defines a provider-neutral format for describing event data. ([CloudEvents][3])
-
----
-
-## 2. Event validation
-
-Validate:
-
-```text
-event_id exists
-customer_id exists
-event_type is registered
-timestamp is valid
-required properties exist
-numeric values are non-negative
-event is not unreasonably far in the future
-```
-
-Return structured errors:
-
-```json
-{
-  "event_id": "evt_009",
-  "status": "rejected",
-  "errors": [
-    {
-      "field": "properties.tokens",
-      "code": "INVALID_NUMBER",
-      "message": "Token count cannot be negative"
-    }
-  ]
-}
-```
-
----
-
-## 3. Idempotency and duplicate prevention
-
-This is one of the strongest engineering signals.
-
-Customers may retry requests after timeouts. The system must not bill the same event twice.
-
-```text
-First request:
-evt_001 → accepted
-
-Retry:
-evt_001 → duplicate, ignored
-```
-
-Store a unique constraint:
+The backend prevents duplicate billing by enforcing uniqueness on:
 
 ```sql
-UNIQUE(workspace_id, event_id)
+UNIQUE(workspace_id, external_event_id)
 ```
 
-Also detect conflicts:
+Behavior:
 
-```text
-Same event_id + same payload
-→ safe duplicate
+- same event ID and same payload = duplicate, ignored
+- same event ID and different payload = idempotency conflict
 
-Same event_id + different payload
-→ idempotency conflict
-```
+Accepted events are stored immutably and are not overwritten.
 
----
+## Meters and pricing
 
-## 4. Immutable event ledger
+Supported meter aggregations:
 
-Keep every accepted raw event.
+- `COUNT`
+- `SUM`
+- `MAX`
+- `MIN`
+- `UNIQUE_COUNT`
+- `LATEST`
 
-```sql
-usage_events
-------------
-id
-workspace_id
-external_event_id
-customer_id
-event_type
-occurred_at
-received_at
-properties JSONB
-payload_hash
-processing_status
-```
+Supported pricing models:
 
-Do not overwrite raw events after ingestion.
+- `flat`
+- `tiered`
+- `volume`
+- `allowance`
+- `credit`
 
-Corrections should be represented through:
-
-* Adjustment events
-* Reversal events
-* Replacement events
-
-That gives you an auditable history.
-
----
-
-## 5. Configurable meter definitions
-
-A meter defines how raw events become usage totals.
-
-Example:
-
-```json
-{
-  "slug": "api_requests",
-  "event_type": "api_request",
-  "aggregation": "COUNT",
-  "group_by": ["endpoint"]
-}
-```
-
-Token meter:
+### Example meter
 
 ```json
 {
   "slug": "input_tokens",
+  "name": "Input Tokens",
   "event_type": "llm_tokens",
   "aggregation": "SUM",
   "value_field": "properties.input_tokens",
-  "group_by": ["model"]
+  "group_by": ["model"],
+  "unit_label": "tokens"
 }
 ```
 
-Support:
-
-```text
-COUNT
-SUM
-MAX
-MIN
-UNIQUE_COUNT
-LATEST
-```
-
-Zenskar’s billable-metric model similarly transforms individual usage events through configurable aggregation logic rather than billing directly from each event. ([Zenskar][4])
-
----
-
-## 6. Late-arriving event handling
-
-An event may arrive today but belong to yesterday’s billing period.
+### Example pricing plan
 
 ```json
 {
-  "occurred_at": "2026-06-14T23:50:00Z",
-  "received_at": "2026-06-15T08:00:00Z"
+  "name": "Input Tokens - Flat",
+  "meter_slug": "input_tokens",
+  "model": "flat",
+  "config": {
+    "rate": 0.001,
+    "per_units": 1000
+  },
+  "currency": "INR"
 }
 ```
 
-Aggregation should use `occurred_at`, not merely ingestion time.
+## Reconciliation
 
-Lago’s ingestion documentation explicitly addresses retries and late-arriving events and assigns usage according to the event timestamp. ([Lago][5])
+Reconciliation compares:
 
-Your system should:
+- raw accepted events
+- aggregated meter totals
+- calculated charges
 
-```text
-Detect affected aggregation window
-Invalidate the previous aggregate
-Recompute the affected customer/meter window
-Record the correction
-```
+It helps identify:
 
----
+- missing events
+- duplicate events
+- unpriced usage
+- unknown customers
+- unknown meters
+- event count mismatches
 
-## 7. Pricing engine
+The API returns the run status, summary metrics, and issues.
 
-Support a few pricing models.
+## Frontend
 
-### Pay-as-you-go
+The frontend provides:
 
-```text
-₹0.01 per API request
-```
+- workspace overview
+- ingest screen
+- event ledger
+- meter management
+- pricing management
+- customer management
+- reconciliation view
+- dead-letter queue
+- API key settings
 
-### Tiered pricing
+It is meant to help operators and developers verify usage flows quickly.
 
-```text
-First 10,000 requests:   ₹0.02 each
-Next 40,000 requests:    ₹0.015 each
-Above 50,000 requests:   ₹0.01 each
-```
+## Local demo data
 
-### Volume pricing
+The local backend seeds a demo workspace with:
 
-```text
-0–10,000 requests:  ₹0.02 for all units
-10,001–50,000:      ₹0.015 for all units
-50,001+:            ₹0.01 for all units
-```
+- customers
+- meters
+- pricing plans
+- fixture usage events
+- rejected events for DLQ testing
 
-### Included allowance
+This is intended for smoke testing and product exploration.
 
-```text
-Monthly included units: 10,000
-Charge only for overage
-```
+## Technology
 
-### Credit consumption
+- Backend: FastAPI + MongoDB-compatible storage
+- Frontend: React + React Router + React Query
+- Validation: Pydantic
+- API auth: `X-API-Key`
 
-```text
-1 image generation = 5 credits
-1 text generation  = 1 credit
-```
+## Notes
 
-Zenskar currently lists pay-as-you-go, tiered, volume-based, prepaid, event-based, free-unit, and overage models among its usage-pricing cases. ([Zenskar][1])
+- The backend and frontend are configured for local development in `app/backend/.env` and `app/frontend/.env`.
+- The project is built to be run locally without external infrastructure.
+- The demo key and demo workspace are only for local smoke tests.
 
----
-
-## 8. Reconciliation engine
-
-This is the differentiating feature.
-
-Compare:
-
-```text
-Raw accepted events
-        vs
-Aggregated usage
-        vs
-Calculated charges
-```
-
-Example:
-
-```text
-Raw token total:          1,250,000
-Aggregated token total:   1,248,500
-Difference:                   1,500
-Status: MISMATCH
-```
-
-The system should identify:
-
-* Missing events
-* Duplicate events
-* Aggregation mismatches
-* Unpriced usage
-* Unknown customers
-* Events outside contract dates
-* Usage assigned to the wrong billing period
-
-Output:
-
-```json
-{
-  "customer_id": "cust_123",
-  "period": "2026-06",
-  "status": "mismatch",
-  "raw_usage": 1250000,
-  "metered_usage": 1248500,
-  "difference": 1500
-}
-```
-
----
-
-## 9. Dead-letter queue and replay
-
-Invalid or temporarily unprocessable events go to a dead-letter queue.
-
-```text
-FAILED_SCHEMA
-UNKNOWN_CUSTOMER
-UNKNOWN_METER
-PROCESSING_ERROR
-```
-
-Admin actions:
-
-```http
-POST /v1/dead-letter-events/{id}/retry
-POST /v1/dead-letter-events/bulk-retry
-```
-
-After correcting a customer or meter configuration, affected events can be replayed safely.
-
----
-
-## 10. Customer usage dashboard
-
-Show:
-
-```text
-Current usage
-Usage by meter
-Estimated bill
-Included allowance remaining
-Recent events
-Rejected events
-```
-
-For example:
-
-```text
-API Requests
-
-Used:       42,560
-Included:   10,000
-Billable:   32,560
-Estimate:   ₹488.40
-```
-
----
-
-# Recommended architecture
-
-
-```text
-┌───────────────────────────┐
-│ REST API / SDK / CSV      │
-└─────────────┬─────────────┘
-              ▼
-┌───────────────────────────┐
-│ Ingestion API             │
-│ Validation + Idempotency  │
-└─────────────┬─────────────┘
-              ▼
-┌───────────────────────────┐
-│ PostgreSQL Event Ledger   │
-└─────────────┬─────────────┘
-              ▼
-┌───────────────────────────┐
-│ Background Workers        │
-│ Aggregation + Pricing     │
-└─────────────┬─────────────┘
-              ▼
-┌───────────────────────────┐
-│ Metered Usage / Charges   │
-└─────────────┬─────────────┘
-              ▼
-┌───────────────────────────┐
-│ Reconciliation + Reports  │
-└───────────────────────────┘
-```
-
-## Tech stack
-
-```text
-Backend:
-TypeScript
-Fastify or NestJS
-PostgreSQL
-Drizzle or Prisma
-
-Jobs:
-BullMQ
-Redis
-
-Frontend:
-Next.js
-TypeScript
-TanStack Query
-
-Testing:
-Vitest
-Testcontainers
-k6
-
-Infrastructure:
-Docker Compose
-GitHub Actions
-OpenTelemetry
-```
-
-For the MVP, PostgreSQL is sufficient. Do not add Kafka, ClickHouse, Kubernetes, and five microservices merely to appear sophisticated.
-
-You can add Redpanda or Kafka later as a documented scale-out version.
-
----
-
-# Database tables
-
-```text
-workspaces
-api_keys
-customers
-
-meter_definitions
-pricing_plans
-pricing_tiers
-customer_plan_assignments
-
-usage_events
-event_processing_attempts
-dead_letter_events
-
-meter_aggregates
-calculated_charges
-billing_periods
-
-reconciliation_runs
-reconciliation_issues
-```
-
----
-
-# ENSURE THESE WORK SPECIFICALLY
-
-Build only this initially:
-
-```text
-1. POST individual and batch usage events
-2. Validate events
-3. Deduplicate by event ID
-4. Store immutable raw events
-5. Configure COUNT and SUM meters
-6. Aggregate usage by customer and month
-7. Apply flat and tiered pricing
-8. Run reconciliation
-9. Display usage and estimated charge
-10. Replay failed events
-```
-
----
-
-# Example demo scenario
-
-Use an AI API company.
-
-## Usage types
-
-```text
-Input tokens
-Output tokens
-Image generations
-API requests
-```
-
-## Pricing
-
-```text
-Input tokens:
-₹0.001 per 1,000 tokens
-
-Output tokens:
-₹0.003 per 1,000 tokens
-
-Images:
-₹2 per image
-
-API requests:
-First 5,000 included
-₹0.01 per request afterward
-```
-
-Generate fixtures containing:
-
-* Valid events
-* Duplicate events
-* Late events
-* Invalid events
-* Unknown customers
-* Events with conflicting idempotency keys
-
-Then demonstrate that the totals remain correct despite retries and late delivery.
-
-
----
-
----
-
-## Product angle
-
-**Target users:** AI SaaS companies, API businesses, cloud infrastructure products, implementation teams, and finance operations teams.
-
-**Value model:** hosted usage-metering API priced by monthly event volume, with higher tiers for reconciliation, usage limits, and audit exports.
