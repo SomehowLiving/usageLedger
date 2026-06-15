@@ -1,0 +1,41 @@
+# Environment and secrets
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+.venv/
+venv/
+
+# Node / frontend
+node_modules/
+**/node_modules/
+dist/
+build/
+**/build/
+.cache/
+**/.cache/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Local tooling
+.claude/
+
