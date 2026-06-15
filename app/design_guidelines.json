@@ -1,0 +1,99 @@
+{
+  "theme": "Light",
+  "archetype": "4 (Swiss & High-Contrast)",
+  "design_philosophy": {
+    "core_identity": "Engineer's tool — confident, precise, data-rich. Stripe-billing-meets-Datadog.",
+    "vibe": "Objective, rigid, functional. No fluff, no generic purple gradients.",
+    "motion": "Minimalist micro-interactions for feedback. No bouncy or decorative animations.",
+    "spacing_strategy": "The 'Control Room' Grid. Dense, strict hierarchy, high scanability."
+  },
+  "typography": {
+    "primary_font": "IBM Plex Sans",
+    "mono_font": "IBM Plex Mono",
+    "rules": {
+      "headings": "IBM Plex Sans. Use tracking-tight for sizes > 32px. Never center by default.",
+      "body": "IBM Plex Sans, text-sm to text-base.",
+      "data_and_metrics": "IBM Plex Mono is MANDATORY for all event IDs, currency amounts (₹), timestamps, API keys, and raw JSON payloads. This establishes the 'terminal/engineer' trust layer.",
+      "labels": "Uppercase, tiny text (text-xs), wide spacing (tracking-[0.2em]) for table headers and overlines."
+    }
+  },
+  "colors": {
+    "background": {
+      "app": "#FAFAFA",
+      "surface": "#FFFFFF",
+      "terminal_surface": "#0A0A0A"
+    },
+    "text": {
+      "primary": "#0A0A0A",
+      "secondary": "#525252",
+      "inverse": "#FAFAFA"
+    },
+    "border": {
+      "default": "#E5E5E5",
+      "strong": "#A3A3A3"
+    },
+    "signal": {
+      "success": "#16A34A",
+      "error_rejected": "#DC2626",
+      "duplicate_warning": "#D97706",
+      "info_active": "#2563EB"
+    },
+    "rules": "Color is Function Only. 95% of the UI should be monochrome (blacks, whites, greys). Signal colors (Red, Green, Amber, Blue) are exclusively reserved for status badges, error states, and live data indicators."
+  },
+  "layout_and_surfaces": {
+    "surface_strategy": "Grid Borders (The 'Technical' Look)",
+    "implementation": "Expose the skeleton. Use pure HTML/Tailwind for structural layouts (do not use default Shadcn Card for everything). Containers should have 1px solid borders. Inner grid items use `border-r border-b border-border` to create a dense, technical blueprint feel.",
+    "border_radius": "Sharp edges. Use `rounded-none` or max `rounded-sm` (4px).",
+    "shadows": "No soft diffuse shadows. Use flat design with 1px borders or hard, solid-color offset shadows if depth is strictly required."
+  },
+  "components": {
+    "icons": {
+      "library": "@phosphor-icons/react",
+      "style": "Regular or Duotone for dense developer tools."
+    },
+    "buttons": {
+      "primary": "Solid black (`bg-[#0A0A0A]`) with white text. Sharp corners. `hover:bg-[#262626]`.",
+      "secondary": "Transparent background, 1px solid black border. `hover:bg-black/5`.",
+      "ghost": "Hover state must explicitly set text color (e.g., `hover:bg-black/5 hover:text-black`)."
+    },
+    "tables": {
+      "style": "Cardless, dense, sortable enterprise tables.",
+      "features": "Sticky headers, horizontal scrolling for large event payloads, monospace data cells.",
+      "row_hover": "`hover:bg-gray-50/50` for scannability."
+    },
+    "charts": {
+      "library": "Recharts or Shadcn Charts",
+      "styling": "Monochrome bars/lines. Use signal colors only when visualizing anomalies or dropped events. No gradient fills on charts—use solid fills or technical hatching patterns."
+    }
+  },
+  "feature_specifications": {
+    "event_ingestion_console": "Split view. Left: 'Terminal' themed text area (`bg-[#0A0A0A] text-gray-300 font-mono`) for pasting raw JSON. Right: Real-time response metrics (Accepted/Rejected/Duplicates) using large typography.",
+    "live_event_ledger": "High-density data table. Sticky leftmost column for Event ID. Use compact status badges (dot + text).",
+    "meter_config_ui": "Technical form layout. Left-aligned labels. Use pure HTML grids for field alignment.",
+    "pricing_plan_builder": "Rule-based vertical flow or side-by-side bento layout. Clear visual distinction between flat rate, volume, and tier inputs.",
+    "customer_usage_dashboard": "Top summary strip for MRR (₹) and totals. Recharts for usage over time. Table for included vs. billable breakdown.",
+    "reconciliation_report": "The most complex view. Data table with visual matching indicators. Show source vs target columns with calculated delta (variance). Highlight mismatches in Signal Red.",
+    "dead_letter_queue": "Focus on actionable errors. High contrast red indicators for failed HTTP codes. Bulk action footer fixed to the bottom.",
+    "workspace_overview": "Bento Grid ('Control Room' Mode). Tight gaps (`gap-4`). Every pixel utilized. Summary widgets (`col-span-1`), Primary Data Chart (`col-span-3`)."
+  },
+  "accessibility_and_testing": {
+    "testing_attributes": "CRITICAL: All interactive and key informational elements MUST include a `data-testid` attribute (kebab-case, role-based, e.g., `data-testid=\"submit-event-button\"`).",
+    "contrast": "Ensure all text meets APCA standards. Focus states must have HIGHER contrast (`focus:ring-2 focus:ring-black focus:ring-offset-1`).",
+    "motion": "Respect `prefers-reduced-motion`. Minimalist transitions (e.g., `transition-colors duration-200`)."
+  },
+  "media_and_images": {
+    "brand_logo": {
+      "url": "https://images.pexels.com/photos/26576975/pexels-photo-26576975.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Minimalist brand logo to be used in the top-left of the navigation or auth screens."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Install `@phosphor-icons/react` for technical iconography.",
+    "Import `IBM Plex Sans` and `IBM Plex Mono` from Google Fonts and configure them in `tailwind.config.js`.",
+    "Use pure HTML/Tailwind for complex grid layouts (Bento/Control Room grids). Do NOT rely solely on Shadcn's `<Card>` component.",
+    "Implement the 'Grid Borders' surface strategy: use `border-collapse` style layouts with `border-border` to create a dense, skeletal technical feel.",
+    "Ensure the Indian Rupee symbol (₹) and all financial/token metrics use `IBM Plex Mono`.",
+    "Never use completely transparent backgrounds for headers; use solid white with a 1px bottom border.",
+    "Apply `data-testid` universally across all interactive elements (buttons, inputs, tabs, table rows) to guarantee testability."
+  ]
+}
